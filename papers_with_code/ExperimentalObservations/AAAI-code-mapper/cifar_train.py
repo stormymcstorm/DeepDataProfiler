@@ -272,4 +272,4 @@ if __name__ == '__main__':
     # Save model
     os.makedirs(model_dir, exist_ok=True)
     print(f'Saving model to {model_dir / "best.pth"}')
-    torch.save(net.state_dict(), model_dir / 'best.pth')
+    torch.save(net.module.state_dict(), model_dir / 'best.pth')
