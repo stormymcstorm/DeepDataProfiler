@@ -20,7 +20,7 @@ import torchvision
 import torchvision.transforms as tv_transforms
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.backends.cudnn as cudnn
+# import torch.backends.cudnn as cudnn
 from catalyst.dl.runner import SupervisedRunner
 from catalyst.dl.callbacks import AccuracyCallback
 
@@ -204,7 +204,7 @@ if __name__ == '__main__':
     NUM_EPOCHS = args.epochs
 
     log_dir = args.log_dir / f'{DATASET}_ResNet18_Custom_Aug'
-    dataset_dir = args.dataset_dir / f'{DATASET.lower()}'
+    dataset_dir = args.dataset_dir / DATASET
     model_dir = args.model_dir / f'{DATASET}_ResNet18_Custom_Aug'
 
     device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
