@@ -21,19 +21,26 @@ OUT_DIR := out
 # PRIVATE VARIABLES
 ################################################################################
 
+_NUM_CLASSES := $(subst CIFAR,,$(DATASET))
 _MODEL_DIR := $(OUT_DIR)/models
 _LOG_DIR := $(OUT_DIR)/logs
 _DATASET_DIR := $(OUT_DIR)/datasets
+_ACTIVATIONS_DIR := $(OUT_DIR)/activations
 
-_MODEL := $(_MODEL_DIR)/$(DATASET)_ResNet18_Custom_Aug/best.pth
+_MODEL_PRE := $(DATASET)_ResNet18_Custom_Aug
+_MODEL := $(_MODEL_DIR)/$(_MODEL_PRE)/best.pth
+_FULL_ACTIVATIONS := $(foreach i, $(shell seq 0 $(shell expr $(_NUM_CLASSES) - 1)),\
+	$(_ACTIVATIONS_DIR)/$(_MODEL_PRE)/full_activations/label$i.hdf5)
 
 ################################################################################
 # COMMANDS
 ################################################################################
 
-.PHONY: train clean
+.PHONY: train full clean
 
 train: $(_MODEL)
+
+full: $(_FULL_ACTIVATIONS)
 
 clean:
 	@rm -rf $(OUT_DIR)
@@ -56,3 +63,13 @@ $(_MODEL): | $(OUT_DIR)
 		--log-dir $(_LOG_DIR) \
 		--dataset-dir $(_DATASET_DIR) \
 		--model-dir $(_MODEL_DIR)
+
+$(_FULL_ACTIVATIONS): | $(OUT_DIR)
+	@echo "> Extracting full activation vectors"
+	@python cifar_extract_full_activations.py \
+		--dataset $(DATASET) \
+		--batch-size $(BATCH_SIZE) \
+		--workers $(WORKERS) \
+		--dataset-dir $(_DATASET_DIR) \
+		--model-dir $(_MODEL_DIR) \
+		--act-dir $(_ACTIVATIONS_DIR)
