@@ -1,8 +1,15 @@
+"""
+TODO
+"""
+
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-import sys
+import argparse
+import pathlib
+import os
 import collections
+
 import torch
 import torchvision
 import torchvision.transforms as tv_transforms
@@ -11,6 +18,7 @@ import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 from catalyst.dl.runner import SupervisedRunner
 from catalyst.dl.callbacks import AccuracyCallback
+
 
 
 class SimpleNet(nn.Module):
@@ -149,13 +157,51 @@ def lr_function(epoch):
 
 
 if __name__ == '__main__':
-    # DATASET = 'CIFAR10'
-    DATASET = sys.argv[1]
-    BATCH_SIZE = 128
-    NUM_WORKERS = 4
-    NUM_EPOCHS = 350
+    parser = argparse.ArgumentParser(
+        description='Train ResNet18 model on CIFAR10/CIFAR100 using Catalyst',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        '--dataset', choices=['CIFAR10', 'CIFAR100'], type=str.upper, default='CIFAR10',
+        help='The dataset to train ResNet18 on.'
+    )
+    parser.add_argument(
+        '--batch-size', type=int, default=128,
+        help='The batch size to train with.'
+    )
+    parser.add_argument(
+        '--workers', type=int, default=4,
+        help='how many subprocesses to use for data loading. 0 means that the data will be loaded in the main process.'
+    )
+    parser.add_argument(
+        '--epochs', type=int, default=350,
+        help='The number of epochs to run.'
+    )
+    parser.add_argument(
+        '--log-dir', type=pathlib.Path, default='logs',
+        help='The directory for catalyst to place its logs.'
+    )
+    parser.add_argument(
+        '--dataset-dir', type=pathlib.Path, default='datasets',
+        help='The directory to read/download datasets from/to.'
+    )
+    parser.add_argument(
+        '--model-dir', type=pathlib.Path, default='models',
+        help='The directory to write the trained model to.'
+    )
 
-    logdir = f'../logs/{DATASET}_ResNet18_Custom_Aug'
+    args = parser.parse_args()
+
+    # DATASET = 'CIFAR10'
+    DATASET = args.dataset
+    BATCH_SIZE = args.batch_size
+    NUM_WORKERS = args.workers
+    NUM_EPOCHS = args.epochs
+
+    log_dir = args.log_dir / f'{DATASET}_ResNet18_Custom_Aug'
+    dataset_dir = args.dataset_dir / f'{DATASET.lower()}'
+    model_dir = args.model_dir / f'{DATASET}_ResNet18_Custom_Aug'
+
     device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
 
     transform_train = tv_transforms.Compose([
@@ -173,15 +219,15 @@ if __name__ == '__main__':
     loaders = collections.OrderedDict()
 
     if DATASET == 'CIFAR10':
-        train = torchvision.datasets.CIFAR10(root='../datasets/cifar10', train=True, download=True,
+        train = torchvision.datasets.CIFAR10(root=dataset_dir, train=True, download=True,
                                              transform=transform_train)
-        test = torchvision.datasets.CIFAR10(root='../datasets/cifar10', train=False, download=True,
+        test = torchvision.datasets.CIFAR10(root=dataset_dir, train=False, download=True,
                                             transform=transform_test)
         num_classes = 10
     elif DATASET == 'CIFAR100':
-        train = torchvision.datasets.CIFAR10(root='../datasets/cifar100', train=True, download=True,
+        train = torchvision.datasets.CIFAR10(root=dataset_dir, train=True, download=True,
                                              transform=transform_train)
-        test = torchvision.datasets.CIFAR10(root='../datasets/cifar100', train=False, download=True,
+        test = torchvision.datasets.CIFAR10(root=dataset_dir, train=False, download=True,
                                             transform=transform_test)
         num_classes = 100
 
@@ -208,8 +254,16 @@ if __name__ == '__main__':
         optimizer=optimizer,
         scheduler=scheduler,
         loaders=loaders,
-        logdir=logdir,
+        logdir=log_dir,
         num_epochs=NUM_EPOCHS,
-        callbacks=[AccuracyCallback(num_classes=num_classes, accuracy_args=[1])],
-        verbose=False
+        callbacks=[
+            AccuracyCallback(num_classes=num_classes, accuracy_args=[1])
+        ],
+        verbose=False,
+        timeit=True,
+        load_best_on_end=True
     )
+
+    os.makedirs(model_dir, exist_ok=True)
+    print(f'Saving model to {model_dir / "best.pth"}')
+    torch.save(net.state_dict(), model_dir / 'best.pth')
