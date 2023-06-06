@@ -1,5 +1,10 @@
 """
-TODO
+Script for training ResNet18 on CIFAR10/CIRFAR100. The trained model is used in
+other scripts to extract activations. See usage in
+```
+python cifar_train.py --help
+```
+for more information on parameters.
 """
 
 import warnings
@@ -264,6 +269,7 @@ if __name__ == '__main__':
         load_best_on_end=True
     )
 
+    # Save model
     os.makedirs(model_dir, exist_ok=True)
     print(f'Saving model to {model_dir / "best.pth"}')
     torch.save(net.state_dict(), model_dir / 'best.pth')
