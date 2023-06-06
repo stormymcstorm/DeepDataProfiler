@@ -20,7 +20,13 @@ def unpickle(file):
 
 def load_model(path, num_classes):
     model = ResNet18(num_classes)
-    model.load_state_dict(torch.load(path, map_location=lambda storage, loc: storage)['model_state_dict'])
+    state = torch.load(path)
+    try:
+        model.load_state_dict(state)
+    except:
+        print(state)
+        raise
+    # model.load_state_dict(torch.load(path, map_location=lambda storage, loc: storage)['model_state_dict'])
     return model
 
 
