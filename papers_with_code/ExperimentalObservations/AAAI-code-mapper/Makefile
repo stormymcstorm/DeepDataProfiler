@@ -22,6 +22,8 @@ OUT_DIR := out
 ################################################################################
 
 _NUM_CLASSES := $(subst CIFAR,,$(DATASET))
+_LABEL_SEQ := $(shell seq 0 $(shell expr $(_NUM_CLASSES) - 1))
+
 _MODEL_DIR := $(OUT_DIR)/models
 _LOG_DIR := $(OUT_DIR)/logs
 _DATASET_DIR := $(OUT_DIR)/datasets
@@ -29,7 +31,7 @@ _ACTIVATIONS_DIR := $(OUT_DIR)/activations
 
 _MODEL_PRE := $(DATASET)_ResNet18_Custom_Aug
 _MODEL := $(_MODEL_DIR)/$(_MODEL_PRE)/best.pth
-_FULL_ACTIVATIONS := $(foreach i, $(shell seq 0 $(shell expr $(_NUM_CLASSES) - 1)),\
+_FULL_ACTIVATIONS := $(foreach i, $(_LABEL_SEQ),\
 	$(_ACTIVATIONS_DIR)/$(_MODEL_PRE)/full_activations/label$i.hdf5)
 
 ################################################################################
