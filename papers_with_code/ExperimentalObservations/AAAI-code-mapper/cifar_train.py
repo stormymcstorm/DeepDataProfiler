@@ -21,7 +21,7 @@ import torch.backends.cudnn as cudnn
 from catalyst.dl.runner import SupervisedRunner
 from catalyst.dl.callbacks import AccuracyCallback
 
-from common_args import BaseParser
+from common_args import TrainExtractParser
 
 class SimpleNet(nn.Module):
     def __init__(self):
@@ -159,16 +159,7 @@ def lr_function(epoch):
 
 
 if __name__ == '__main__':
-    parser = BaseParser(description = 'Train a ResNet18 model on CIFAR10/CIFAR100 using Catalyst')
-    parser.add_dataset_arg()
-    parser.add_argument(
-        '--workers', type=int, default=4,
-        help='How many subprocesses to use for data loading. 0 means the data will be loaded in the main process.'
-    )
-    parser.add_argument(
-        '--batch-size', type=int, default=128,
-        help='The batch size to train with.'
-    )
+    parser = TrainExtractParser(description = 'Train a ResNet18 model on CIFAR10/CIFAR100 using Catalyst')
     parser.add_argument(
         '--epochs', type=int, default=350,
         help='The number of epochs to run.'

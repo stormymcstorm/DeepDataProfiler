@@ -8,7 +8,6 @@ OUT_DIR 		:= out
 DATASET 		:= CIFAR10
 # TODO: Change to 350
 EPOCHS			:= 1
-BATCH_SIZE	:= 128
 WORKERS			:= $(shell expr $(shell nproc) / 2)
 
 ################################################################################
@@ -18,6 +17,8 @@ WORKERS			:= $(shell expr $(shell nproc) / 2)
 ################################################################################
 
 _MODEL := $(OUT_DIR)/models/$(DATASET)_ResNet18_Custom_Aug/best.pth
+_ACTIVATIONS_DIR := $(OUT_DIR)/activations/$(DATASET)_ResNet18_Custom_Aug
+_FULL_ACTIVATIONS := $(_ACTIVATIONS_DIR)/full_activations/touch
 
 ################################################################################
 # COMMANDS
@@ -25,9 +26,11 @@ _MODEL := $(OUT_DIR)/models/$(DATASET)_ResNet18_Custom_Aug/best.pth
 # 
 ################################################################################
 
-.PHONY: clean train
+.PHONY: clean train full
 
 train: $(_MODEL)
+
+full: $(_FULL_ACTIVATIONS)
 
 clean:
 	@echo Removing $(OUT_DIR)
@@ -48,10 +51,14 @@ $(_MODEL): | $(OUT_DIR)
 	@python cifar_train.py \
 		--cache-dir $(OUT_DIR) \
 		--dataset $(DATASET) \
-		--batch-size $(BATCH_SIZE) \
 		--workers $(WORKERS) \
 		--epochs $(EPOCHS)
 
-
+$(_FULL_ACTIVATIONS): $(_MODEL)
+	@echo "---- Extracting full activations ----"
+	@python cifar_extract_full_activations.py  \
+		--cache-dir $(OUT_DIR) \
+		--dataset $(DATASET) \
+		--workers $(WORKERS)
 
 
