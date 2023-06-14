@@ -264,7 +264,7 @@ if __name__ == '__main__':
         callbacks=[
             AccuracyCallback(num_classes=num_classes, accuracy_args=[1])
         ],
-        verbose=False,
+        verbose=True,
         timeit=True,
         load_best_on_end=True
     )

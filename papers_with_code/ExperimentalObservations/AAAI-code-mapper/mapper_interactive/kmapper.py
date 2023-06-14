@@ -542,9 +542,9 @@ class KeplerMapper(object):
 
         # define a helper function that takes a hypercube and clusterer and returns cluster predictions
         from sklearn.metrics.pairwise import pairwise_distances
+        out_of_memory = -1
         if use_gpu and metric == 'euclidean':
             import torch
-            out_of_memory = -1
             cuda_avail = torch.cuda.is_available()
 
             def torch_cdist(X):
@@ -554,6 +554,8 @@ class KeplerMapper(object):
                 return d
 
         def cluster_helper(hypercube, cube_idx):
+            nonlocal out_of_memory
+
             if hypercube.shape[0] >= min_cluster_samples:
                 ids = [int(nn) for nn in hypercube[:, 0]]
                 X_cube = X[ids]

@@ -7,6 +7,9 @@ Created on Tue Jun 15 03:13:25 2021
 
 import os
 import sys
+import argparse
+import pathlib
+
 import h5py
 import torch
 import torchvision
@@ -17,7 +20,40 @@ from cifar_train import ResNet18
 from cifar_extract import load_model, inv_normalize, get_activations, read_activation
 
 if __name__ == '__main__':
-    DATASET = "CIFAR10"
+    parser = argparse.ArgumentParser(
+        description='Extract full activation vectors',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        '--dataset', choices=['CIFAR10', 'CIFAR100'], type=str.upper, default='CIFAR10',
+        help='The dataset to train ResNet18 on.'
+    )
+    parser.add_argument(
+        '--batch-size', type=int, default=128,
+        help='The batch size to train with.'
+    )
+    parser.add_argument(
+        '--workers', type=int, default=4,
+        help='how many subprocesses to use for data loading. 0 means that the data will be loaded in the main process.'
+    )
+    parser.add_argument(
+        '--dataset-dir', type=pathlib.Path, default='datasets',
+        help='The directory to read/download datasets from/to.'
+    )
+    parser.add_argument(
+        '--model-dir', type=pathlib.Path, default='models',
+        help='The directory to write the trained model to.'
+    )
+    parser.add_argument(
+        '--act-dir', type=pathlib.Path, default='activations',
+        help='The directory to write the activations to.'
+    )
+
+    args = parser.parse_args()
+
+    DATASET = args.dataset
+    BATCH_SIZE = args.batch_size
+    NUM_WORKERS = args.workers
 
     norm_mean = np.array((0.4914, 0.4822, 0.4465))
     norm_std = np.array((0.2023, 0.1994, 0.2010))
@@ -25,17 +61,25 @@ if __name__ == '__main__':
                                                  torchvision.transforms.Normalize(norm_mean.tolist(),
                                                                                   norm_std.tolist())])
 
-    train = torchvision.datasets.CIFAR10(root='../datasets/cifar10', train=True, download=False,
-                                             transform=transforms)
-    num_classes = 10
-    
-    trainloader = torch.utils.data.DataLoader(train, shuffle=True, batch_size=2048, num_workers=4)
+    dataset_dir = args.dataset_dir / DATASET
+    model_dir = args.model_dir / f'{DATASET}_ResNet18_Custom_Aug'
+    activation_dir = args.act_dir / f'{DATASET}_ResNet18_Custom_Aug' / 'sampled_activations'
 
-    net = load_model(f'../logs/{DATASET}_ResNet18_Custom_Aug/checkpoints/best.pth', num_classes)
+    os.makedirs(activation_dir, exist_ok=True)
+
+    if DATASET == 'CIFAR10':
+        train = torchvision.datasets.CIFAR10(root=dataset_dir, train=True, download=False,
+                                                transform=transforms)
+        num_classes = 10
+    else:
+        raise NotImplementedError(f'Sorry this script does not support {DATASET}')
+    
+    trainloader = torch.utils.data.DataLoader(train, shuffle=True, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS)
+
+    net = load_model(model_dir / 'best.pth', num_classes)
     net.eval()
 
-    activation_dir = f'../activations/{DATASET.lower()}/resnet18_custom_aug/sampled_activations/'
-    output_dir = '../datasets/cifar10_single_batch_df/'
+    output_dir = args.dataset_dir / 'cifar10_single_batch_df'
     
     if not os.path.isdir(activation_dir):
         os.makedirs(activation_dir)
@@ -98,7 +142,7 @@ if __name__ == '__main__':
         # print(layer_activations_df.iloc[:20, :20])
         
         # print("prediction accuracy:", np.sum(layer_activations_df['predictions']=='true')/len(layer_activations_df['predictions']))
-        layer_activations_df.to_csv(output_dir+"train_single_batch_"+layer+".csv", index=False)
+        layer_activations_df.to_csv(output_dir / ("train_single_batch_"+layer+".csv"), index=False)
     
     
     

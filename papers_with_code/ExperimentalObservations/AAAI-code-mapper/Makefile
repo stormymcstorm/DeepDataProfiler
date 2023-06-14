@@ -33,16 +33,20 @@ _MODEL_PRE := $(DATASET)_ResNet18_Custom_Aug
 _MODEL := $(_MODEL_DIR)/$(_MODEL_PRE)/best.pth
 _FULL_ACTIVATIONS := $(foreach i, $(_LABEL_SEQ),\
 	$(_ACTIVATIONS_DIR)/$(_MODEL_PRE)/full_activations/label$i.hdf5)
+_SAMPLED_ACTIVATIONS := $(foreach i, $(_LABEL_SEQ),\
+	$(_ACTIVATIONS_DIR)/$(_MODEL_PRE)/sampled_activations/label$i.hdf5)
 
 ################################################################################
 # COMMANDS
 ################################################################################
 
-.PHONY: train full clean
+.PHONY: train full clean sampled
 
 train: $(_MODEL)
 
 full: $(_FULL_ACTIVATIONS)
+
+sampled: $(_SAMPLED_ACTIVATIONS)
 
 clean:
 	@rm -rf $(OUT_DIR)
@@ -66,9 +70,19 @@ $(_MODEL): | $(OUT_DIR)
 		--dataset-dir $(_DATASET_DIR) \
 		--model-dir $(_MODEL_DIR)
 
-$(_FULL_ACTIVATIONS): | $(OUT_DIR)
+$(_FULL_ACTIVATIONS): $(_MODEL) | $(OUT_DIR)
 	@echo "> Extracting full activation vectors"
 	@python cifar_extract_full_activations.py \
+		--dataset $(DATASET) \
+		--batch-size $(BATCH_SIZE) \
+		--workers $(WORKERS) \
+		--dataset-dir $(_DATASET_DIR) \
+		--model-dir $(_MODEL_DIR) \
+		--act-dir $(_ACTIVATIONS_DIR)
+
+$(_SAMPLED_ACTIVATIONS): $(_MODEL) | $(OUT_DIR)
+	@echo "> Extracting sampled activation vectors"
+	@python cifar_extract_sampled_activations.py \
 		--dataset $(DATASET) \
 		--batch-size $(BATCH_SIZE) \
 		--workers $(WORKERS) \
