@@ -1,8 +1,17 @@
+#! /usr/bin/env python
+
+"""
+Script used for training ResNet18 on CIFAR10/CIFAR100.
+"""
+
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import sys
 import collections
+import argparse
+import os
+
 import torch
 import torchvision
 import torchvision.transforms as tv_transforms
@@ -12,6 +21,7 @@ import torch.backends.cudnn as cudnn
 from catalyst.dl.runner import SupervisedRunner
 from catalyst.dl.callbacks import AccuracyCallback
 
+from common_args import BaseParser
 
 class SimpleNet(nn.Module):
     def __init__(self):
@@ -149,13 +159,34 @@ def lr_function(epoch):
 
 
 if __name__ == '__main__':
-    # DATASET = 'CIFAR10'
-    DATASET = sys.argv[1]
-    BATCH_SIZE = 128
-    NUM_WORKERS = 4
-    NUM_EPOCHS = 350
+    parser = BaseParser(description = 'Train a ResNet18 model on CIFAR10/CIFAR100 using Catalyst')
+    parser.add_dataset_arg()
+    parser.add_argument(
+        '--workers', type=int, default=4,
+        help='How many subprocesses to use for data loading. 0 means the data will be loaded in the main process.'
+    )
+    parser.add_argument(
+        '--batch-size', type=int, default=128,
+        help='The batch size to train with.'
+    )
+    parser.add_argument(
+        '--epochs', type=int, default=350,
+        help='The number of epochs to run.'
+    )
 
-    logdir = f'../logs/{DATASET}_ResNet18_Custom_Aug'
+    args = parser.parse_args()
+
+    dataset = args.dataset.upper()
+    batch_size = args.batch_size
+    num_epochs = args.epochs
+    num_workers = args.workers
+
+    cache_dir = args.cache_dir
+    log_dir = cache_dir / 'logs' / f'{dataset}_ResNet18_Custom_Aug'
+    dataset_dir = cache_dir / 'datasets' / dataset
+    model_dir = cache_dir / 'models' / f'{dataset}_ResNet18_Custom_Aug'
+
+
     device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
 
     transform_train = tv_transforms.Compose([
@@ -172,28 +203,32 @@ if __name__ == '__main__':
 
     loaders = collections.OrderedDict()
 
-    if DATASET == 'CIFAR10':
-        train = torchvision.datasets.CIFAR10(root='../datasets/cifar10', train=True, download=True,
+    if dataset == 'CIFAR10':
+        train = torchvision.datasets.CIFAR10(root=dataset_dir, train=True, download=True,
                                              transform=transform_train)
-        test = torchvision.datasets.CIFAR10(root='../datasets/cifar10', train=False, download=True,
+        test = torchvision.datasets.CIFAR10(root=dataset_dir, train=False, download=True,
                                             transform=transform_test)
         num_classes = 10
-    elif DATASET == 'CIFAR100':
-        train = torchvision.datasets.CIFAR10(root='../datasets/cifar100', train=True, download=True,
+    elif dataset == 'CIFAR100':
+        train = torchvision.datasets.CIFAR100(root=dataset_dir, train=True, download=True,
                                              transform=transform_train)
-        test = torchvision.datasets.CIFAR10(root='../datasets/cifar100', train=False, download=True,
+        test = torchvision.datasets.CIFAR100(root=dataset_dir, train=False, download=True,
                                             transform=transform_test)
         num_classes = 100
 
-    trainloader = torch.utils.data.DataLoader(train, shuffle=True, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS)
-    testloader = torch.utils.data.DataLoader(test, shuffle=False, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS)
+    trainloader = torch.utils.data.DataLoader(
+        train, shuffle=True, batch_size=batch_size, num_workers=num_workers
+    )
+    testloader = torch.utils.data.DataLoader(
+        test, shuffle=False, batch_size=batch_size, num_workers=num_workers
+    )
 
     loaders["train"] = trainloader
     loaders["valid"] = testloader
 
     # model, criterion, optimizer
     net = ResNet18(num_classes)
-    net = torch.nn.DataParallel(net, device_ids=[0]).cuda()
+    net = torch.nn.DataParallel(net, device_ids=[0]).cuda() # TODO: probably remove .cuda()
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(net.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
@@ -208,8 +243,15 @@ if __name__ == '__main__':
         optimizer=optimizer,
         scheduler=scheduler,
         loaders=loaders,
-        logdir=logdir,
-        num_epochs=NUM_EPOCHS,
+        logdir=log_dir,
+        num_epochs=num_epochs,
         callbacks=[AccuracyCallback(num_classes=num_classes, accuracy_args=[1])],
-        verbose=False
+        verbose=True,
+        timeit=True,
+        load_best_on_end=True
     )
+
+    # Save the model
+    os.makedirs(model_dir, exist_ok=True)
+    print(f'Saving model to {model_dir / "best.pth"}')
+    torch.save(net.module.state_dict(), model_dir / 'best.pth')
