@@ -12,7 +12,7 @@ import h5py
 import torch
 import torch.nn.functional as F
 from cifar_extract import read_activation
-from mapper_interactive.mapper_CLI import get_mapper_graph
+from mapper_interactive.mapper_CLI import _get_mapper_graph
 from matplotlib import pyplot as plt
 
 
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     output_dir = '../mapper_graphs/full_batches_noises/'
     output_fname = 'full_batches_'+layer+'_'+str(sigma)
     
-    get_mapper_graph(layer_activations_df, interval, overlap, eps, min_samples, output_dir, output_fname, is_parallel=False)
+    _get_mapper_graph(layer_activations_df, interval, overlap, eps, min_samples, output_dir, output_fname, is_parallel=False)
     
     
 

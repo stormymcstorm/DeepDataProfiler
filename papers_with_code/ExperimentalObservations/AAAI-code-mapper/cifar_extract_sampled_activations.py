@@ -7,17 +7,36 @@ Created on Tue Jun 15 03:13:25 2021
 
 import os
 import sys
+from glob import glob
+
 import h5py
 import torch
 import torchvision
 import numpy as np
 import pandas as pd
-from glob import glob
-from cifar_train import ResNet18
-from cifar_extract import load_model, inv_normalize, get_activations, read_activation
+
+from cifar_extract import load_model, get_activations, read_activation
+from common_args import TrainExtractParser
 
 if __name__ == '__main__':
-    DATASET = "CIFAR10"
+    parser = TrainExtractParser(
+        description = 'Extract full activation vectors.',
+        batch_size=2048
+    )
+
+    parser.add_argument('--skip', action='store_true')
+
+    args = parser.parse_args()
+
+    dataset = args.dataset.upper()
+    batch_size = args.batch_size
+    num_workers = args.workers
+
+    cache_dir = args.cache_dir
+    dataset_dir = cache_dir / 'datasets' / dataset
+    activation_dir = cache_dir / 'activations' / f'{dataset}_ResNet18_Custom_Aug'
+    output_dir = cache_dir / 'activations' / f'{dataset}_ResNet18_Custom_Aug' / 'full_activations'
+    model_path = cache_dir / 'models' / f'{dataset}_ResNet18_Custom_Aug' / 'best.pth'
 
     norm_mean = np.array((0.4914, 0.4822, 0.4465))
     norm_std = np.array((0.2023, 0.1994, 0.2010))
@@ -25,47 +44,47 @@ if __name__ == '__main__':
                                                  torchvision.transforms.Normalize(norm_mean.tolist(),
                                                                                   norm_std.tolist())])
 
-    train = torchvision.datasets.CIFAR10(root='../datasets/cifar10', train=True, download=False,
+    if dataset == 'CIFAR10':
+        train = torchvision.datasets.CIFAR10(root=dataset_dir, train=True, download=False,
                                              transform=transforms)
-    num_classes = 10
+    if dataset == 'CIFAR100':
+        train = torchvision.datasets.CIFAR100(root=dataset_dir, train=True, download=False,
+                                              transform=transforms)
     
-    trainloader = torch.utils.data.DataLoader(train, shuffle=True, batch_size=2048, num_workers=4)
+    label_names = train.classes
+    num_classes = len(label_names)
 
-    net = load_model(f'../logs/{DATASET}_ResNet18_Custom_Aug/checkpoints/best.pth', num_classes)
+    net = load_model(model_path, num_classes)
     net.eval()
 
-    activation_dir = f'../activations/{DATASET.lower()}/resnet18_custom_aug/sampled_activations/'
-    output_dir = '../datasets/cifar10_single_batch_df/'
-    
-    if not os.path.isdir(activation_dir):
-        os.makedirs(activation_dir)
-        
-    if not os.path.isdir(output_dir):
-        os.makedirs(output_dir)
+    layer_names = []
+    for name, m in net.named_modules():
+        if isinstance(m, torch.nn.BatchNorm2d) and not 'shortcut' in name:
+            layer_names.append(name)
 
-    for label_filter in range(num_classes):
-        activations = get_activations(net, trainloader, label_filter, is_sample=True)
-        with h5py.File(os.path.join(activation_dir, f'label{label_filter}.hdf5'), 'w') as out_file:
-            [out_file.create_dataset(layer_name, data=layer_act) for layer_name, layer_act in
-             activations.items()]
-        del activations
+    os.makedirs(output_dir, exist_ok=True)
+
+    print('Collecting activations...')
+
+    for layer_name in layer_names:
+        print(f'for layer {layer_name}')
         
-    all_files = glob(os.path.join(activation_dir, '*.hdf5'))
+    # all_files = glob(os.path.join(activation_dir, '*.hdf5'))
     
-    names = ['airplane',
-      'automobile',
-      'bird',
-      'cat',
-      'deer',
-      'dog',
-      'frog',
-      'horse',
-      'ship',
-      'truck']
+    # names = ['airplane',
+    #   'automobile',
+    #   'bird',
+    #   'cat',
+    #   'deer',
+    #   'dog',
+    #   'frog',
+    #   'horse',
+    #   'ship',
+    #   'truck']
     
-    layers_name = ['layer4.1.bn2', 'layer4.1.bn1', 'layer4.0.bn2', 'layer4.0.bn1', 'layer3.1.bn2', 'layer3.1.bn1',
-                   'layer3.0.bn2', 'layer3.0.bn1', 'layer2.1.bn2', 'layer2.1.bn1', 'layer2.0.bn2', 'layer2.0.bn1',
-                   'layer1.1.bn2', 'layer1.1.bn1', 'layer1.0.bn2', 'layer1.0.bn1']
+    # layers_name = ['layer4.1.bn2', 'layer4.1.bn1', 'layer4.0.bn2', 'layer4.0.bn1', 'layer3.1.bn2', 'layer3.1.bn1',
+    #                'layer3.0.bn2', 'layer3.0.bn1', 'layer2.1.bn2', 'layer2.1.bn1', 'layer2.0.bn2', 'layer2.0.bn1',
+    #                'layer1.1.bn2', 'layer1.1.bn1', 'layer1.0.bn2', 'layer1.0.bn1']
         
     
     for idx in range(len(layers_name)):

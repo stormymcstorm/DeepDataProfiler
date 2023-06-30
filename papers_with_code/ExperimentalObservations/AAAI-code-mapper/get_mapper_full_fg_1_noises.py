@@ -17,7 +17,7 @@ import torch
 import torch.nn.functional as F
 from pynndescent import NNDescent
 from matplotlib import pyplot as plt
-from mapper_interactive.mapper_CLI import get_mapper_graph
+from mapper_interactive.mapper_CLI import _get_mapper_graph
 
 if __name__ == '__main__':
     layer = sys.argv[1]
@@ -68,5 +68,5 @@ if __name__ == '__main__':
     output_fname = 'full_fg_1_'+layer+'_'+str(sigma)
     # output_fname = 'train_single_batch_layer4.1.bn2.csv'
     
-    get_mapper_graph(layer_activations_df, interval, overlap, eps, min_samples, output_dir, output_fname)
+    _get_mapper_graph(layer_activations_df, interval, overlap, eps, min_samples, output_dir, output_fname)
     

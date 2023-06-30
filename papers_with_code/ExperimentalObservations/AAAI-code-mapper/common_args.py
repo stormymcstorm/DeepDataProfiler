@@ -13,7 +13,11 @@ def dir_path(s):
         raise NotADirectoryError(s)
 
 class BaseParser(argparse.ArgumentParser):
-    def __init__(self, **kwargs):
+    def __init__(
+        self, 
+        dataset_choices=['CIFAR10', 'CIFAR100'],
+        **kwargs
+    ):
         kwargs.setdefault('formatter_class', argparse.ArgumentDefaultsHelpFormatter)
 
         super().__init__(**kwargs)
@@ -23,21 +27,21 @@ class BaseParser(argparse.ArgumentParser):
             help='The path to the directory where experimental results should be cached.'
         )
         
+        self.add_argument(
+            '--dataset', choices=dataset_choices, type=str.upper, default=dataset_choices[0],
+            help='The dataset used for training.'
+        )
 
 class TrainExtractParser(BaseParser):
     def __init__(
         self, 
-        dataset_choices=['CIFAR10', 'CIFAR100'],
         workers=4,
         batch_size=128,
         **kwargs
     ):
         super().__init__(**kwargs)
 
-        self.add_argument(
-            '--dataset', choices=dataset_choices, type=str.upper, default=dataset_choices[0],
-            help='The dataset used for training.'
-        )
+        
         self.add_argument(
             '--workers', type=int, default=workers,
             help='How many subprocesses to use for data loading. 0 means the data will be loaded in the main process.'
@@ -47,3 +51,29 @@ class TrainExtractParser(BaseParser):
             help='The batch size to load data with.'
         )
 
+class GetMapperParser(BaseParser):
+    def __init__(
+        self, 
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+
+        self.add_argument(
+            'layer', type=str, 
+            help='The layer to generate a mapper graph for.'
+        )
+
+        self.add_argument(
+            '--interval', type=int, default=40,
+            help='TODO'
+        )
+
+        self.add_argument(
+            '--overlap', type=int, default=30,
+            help='TODO'
+        )
+
+        self.add_argument(
+            '--eps', type=float,
+            help='TODO'
+        )

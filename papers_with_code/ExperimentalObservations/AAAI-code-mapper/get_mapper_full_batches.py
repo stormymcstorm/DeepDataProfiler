@@ -4,88 +4,102 @@
 Created on Mon Jul 12 02:41:48 2021
 
 """
+
 import os
 import sys
+
+
 import numpy as np
 import pandas as pd
-import h5py
-import torch
+import torchvision
 import torch.nn.functional as F
+
 from mapper_interactive.mapper_CLI import get_mapper_graph
 from get_knn import elbow_eps
-
-def read_activation(filepath, layer):
-    with h5py.File(filepath, 'r') as f:
-        activation = f[layer][:]
-        return activation
+from common_args import GetMapperParser
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK']='True'
-    layer = sys.argv[1]
-    interval = int(sys.argv[2])
-    overlap = int(sys.argv[3])
+
+    parser = GetMapperParser(
+      description = 'Generate a mapper graph from full activations',
+      dataset_choices=['CIFAR10']
+    )
+
+    parser.add_argument(
+      '--seed', type=int, default=42
+    )
+
+    args = parser.parse_args()
+
+    dataset = args.dataset
+    layer = args.layer
+    interval = args.interval
+    overlap = args.overlap
     
-    DATASET = 'CIFAR10'
     num_classes = 10
 
-    activation_dir = f'../activations/{DATASET.lower()}/resnet18_custom_aug/full_activations'
+    cache_dir = args.cache_dir
+    dataset_dir = cache_dir / 'datasets' / dataset
+    mapper_dir = cache_dir / 'mapper_graphs' / f'{dataset}_ResNet18_Custom_Aug' / 'full_batches'
     
-    names = ['airplane',
-      'automobile',
-      'bird',
-      'cat',
-      'deer',
-      'dog',
-      'frog',
-      'horse',
-      'ship',
-      'truck']
-    
-    print("collection full activations for", layer)
-    layer_activations = []
-    for i in range(num_classes):
-        print(i)
-        layer_activations_i = read_activation(os.path.join(activation_dir, 'label'+str(i)+'.hdf5'), layer)
-        layer_activations_i = torch.tensor(layer_activations_i)
-        layer_activations_i = F.relu(layer_activations_i[:, :, :, :]).numpy()
-        num_patches = layer_activations_i.shape[2]
-        layer_activations_i_new = []
-        for j in range(num_patches):
-            for k in range(num_patches):
-                layer_activations_i_new.append(layer_activations_i[:,:,j,k])
-        layer_activations_i = np.vstack([l for l in layer_activations_i_new])
-        label_i = np.repeat(i, len(layer_activations_i)).reshape(-1,1)
-        layer_activations_i = np.hstack([label_i, layer_activations_i])
-        layer_activations.append(layer_activations_i)
-    
-    layer_activations = np.vstack([layer_activations_i for layer_activations_i in layer_activations])
-    layer_activations_df = pd.DataFrame(layer_activations)
-    
-    cols = np.array(['label'])
-    cols = np.concatenate((cols,np.arange(1,layer_activations.shape[1]).astype("str")))
-    
-    layer_activations_df.columns = cols 
-    layer_activations_df['label'] = [names[int(layer_activations_df['label'].iloc[i])] for i in range(len(layer_activations_df))]
-    print(layer_activations_df.shape)
+    activation_pth = cache_dir / 'activations' / f'{dataset}_ResNet18_Custom_Aug' \
+      / 'full_activations' / f'{layer}.npy'
+    cat_path = cache_dir / 'activations' / f'{dataset}_ResNet18_Custom_Aug' \
+      / 'full_activations' / f'meta_{layer}.csv'
 
-    if layer_activations_df.shape[0] > 800000:
-        selected_indices = np.random.choice(layer_activations_df.shape[0], 800000)
-        layer_activations_df = layer_activations_df.iloc[selected_indices, :]
+    if dataset == 'CIFAR10':
+      norm_mean = np.array((0.4914, 0.4822, 0.4465))
+      norm_std = np.array((0.2023, 0.1994, 0.2010))
+      transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
+                                                  torchvision.transforms.Normalize(norm_mean.tolist(),
+                                                                                    norm_std.tolist())])
 
-    print(layer_activations_df.shape)
+      train = torchvision.datasets.CIFAR10(root=dataset_dir, train=True, download=False,
+                                            transform=transforms)
+      num_classes = 10
 
-    try:
-      eps = float(sys.argv[4])
-    except:
-      eps = elbow_eps(layer_activations_df.iloc[:, 1:])
+    label_names = train.classes
+
+    rng = np.random.default_rng(args.seed)
+
+    print(f'Loading activations from {activation_pth}')
+    layer_activations = np.load(
+      file = activation_pth,
+      mmap_mode='r',
+      allow_pickle=True,
+    )
+
+    categorical = pd.read_csv(cat_path)
+
+    if layer_activations.shape[0] > 80_000:
+      selected_indices = np.random.choice(layer_activations.shape[0], 80_000, replace=False)
+      layer_activations = layer_activations[selected_indices, :]
+      categorical = categorical.iloc[selected_indices, :]
+
+    if args.eps is not None:
+      eps = args.eps
+    else:
+      eps = elbow_eps(layer_activations)
     print("eps", eps)
             
     min_samples = 5
     
-    output_dir = '../mapper_graphs/full_batches/'
-    output_fname = 'full_batches_'+layer
+
+    os.makedirs(mapper_dir, exist_ok=True)
+    mapper_pth = mapper_dir \
+      / f'mapper_full_batches_{layer}_{interval}_{overlap}_{eps}.json'
     
-    get_mapper_graph(layer_activations_df, interval, overlap, eps, min_samples, output_dir, output_fname, is_parallel=False)
+    get_mapper_graph(
+      layer_activations,
+      categorical,
+      interval, 
+      overlap,
+      eps, 
+      min_samples, 
+      mapper_pth,
+      is_parallel=False
+    )
     
     
 

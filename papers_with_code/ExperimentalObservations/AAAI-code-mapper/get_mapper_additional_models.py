@@ -18,7 +18,7 @@ import torch.nn.functional as F
 from pynndescent import NNDescent
 from matplotlib import pyplot as plt
 from get_knn import elbow_eps
-from mapper_interactive.mapper_CLI import get_mapper_graph
+from mapper_interactive.mapper_CLI import _get_mapper_graph
 
 if __name__ == '__main__':
     model = sys.argv[1]
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     output_dir = '../mapper_graphs/additional_models/'
     output_fname = model+'_'+layer
     
-    get_mapper_graph(layer_activations_df, interval, overlap, eps, min_samples, output_dir, output_fname, is_additional=True)
+    _get_mapper_graph(layer_activations_df, interval, overlap, eps, min_samples, output_dir, output_fname, is_additional=True)
     
     
 

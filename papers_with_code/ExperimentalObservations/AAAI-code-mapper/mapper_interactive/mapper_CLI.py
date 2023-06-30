@@ -63,7 +63,7 @@ def get_node_id(node):
     return node_id
 
 
-def get_mapper_graph(df, interval, overlap, eps, min_samples, output_dir, output_fname, is_parallel=True, is_cifar100=False, is_additional=False):
+def _get_mapper_graph(df, interval, overlap, eps, min_samples, output_dir, output_fname, is_parallel=True, is_cifar100=False, is_additional=False):
     print("get mapper for", output_fname)
     if is_additional:
         df_np = df.iloc[:,:-3].to_numpy()
@@ -107,3 +107,44 @@ def get_mapper_graph(df, interval, overlap, eps, min_samples, output_dir, output
 
     with open(join(output_dir, filename), 'w') as fp:
         json.dump(g, fp)
+
+def get_mapper_graph(
+    activations,
+    categorical,
+    interval,
+    overlap, 
+    eps, 
+    min_samples,
+    output_fname, 
+    is_parallel=True,
+):
+    filter_str = 'l2norm'
+    filter_fn = get_filter_fn(activations, filter_str)
+
+    clusterer = DBSCAN(eps=eps, min_samples=min_samples)
+    cover = Cover(n_cubes=interval, perc_overlap=overlap / 100)
+
+    g = graph_to_dict(mapper_wrapper(
+        activations, 
+        filter_fn, 
+        clusterer, 
+        cover, 
+        is_parallel=is_parallel
+    ))
+
+    for node_id in g['nodes']:
+        vertices = g['nodes'][node_id]
+        node = {}
+        node['categorical_cols_summary'] = {}
+        node['vertices'] = vertices
+        for name, values in categorical.items():
+            node['categorical_cols_summary'][name] = values.value_counts().to_dict()
+        node['avgs'] = {}
+        node['avgs']['lens'] = np.mean(filter_fn[vertices])
+        g['nodes'][node_id] = node
+    g['categorical_cols'] = list(categorical.columns)
+    g['numerical_col_keys'] = ['lens']
+
+    
+    with open(output_fname, 'w') as f:
+        json.dump(g, f)

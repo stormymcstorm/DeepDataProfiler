@@ -10,7 +10,7 @@ import sys
 import numpy as np
 import pandas as pd
 from get_knn import elbow_eps
-from mapper_interactive.mapper_CLI import get_mapper_graph
+from mapper_interactive.mapper_CLI import _get_mapper_graph
 
 if __name__ == '__main__':
     layer = sys.argv[1]
@@ -34,5 +34,5 @@ if __name__ == '__main__':
     output_dir = '../mapper_graphs/full_fg_1/'
     output_fname = 'full_fg_1_'+layer
     
-    get_mapper_graph(layer_activations_df, interval, overlap, eps, min_samples, output_dir, output_fname)
+    _get_mapper_graph(layer_activations_df, interval, overlap, eps, min_samples, output_dir, output_fname)
     
